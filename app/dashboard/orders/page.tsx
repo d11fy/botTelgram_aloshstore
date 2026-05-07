@@ -235,7 +235,18 @@ export default function OrdersPage() {
             {selectedOrder.proof_image && (
               <div className="glass rounded-xl p-3">
                 <p className="text-gray-400 text-xs mb-2">إثبات الدفع</p>
-                <p className="text-yellow-400 text-xs">📎 صورة مرفقة من تلجرام (File ID: {selectedOrder.proof_image.slice(0, 20)}...)</p>
+                <a
+                  href={`/api/telegram-file/${selectedOrder.proof_image}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                    src={`/api/telegram-file/${selectedOrder.proof_image}`}
+                    alt="إثبات الدفع"
+                    className="rounded-xl max-h-72 w-full object-contain border border-primary-700/40 cursor-pointer hover:opacity-90 transition-opacity"
+                  />
+                </a>
+                <p className="text-gray-500 text-xs mt-1 text-center">اضغط للتكبير</p>
               </div>
             )}
 
