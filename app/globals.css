@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    direction: rtl;
+  }
+
+  body {
+    background: #020617;
+    color: #ffffff;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+}
+
+@layer components {
+  .glass {
+    background: rgba(30, 58, 138, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+  }
+
+  .gold-text {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .primary-gradient {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb, #3b82f6);
+  }
+
+  .card-hover {
+    transition: all 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 40px rgba(37, 99, 235, 0.2);
+  }
+
+  .input-dark {
+    @apply bg-blue-950/50 border border-blue-800/50 text-white rounded-xl px-4 py-2.5 w-full
+           focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50
+           placeholder:text-gray-500 transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600
+           text-white font-semibold px-6 py-2.5 rounded-xl transition-all duration-200
+           shadow-lg active:scale-95 cursor-pointer;
+  }
+
+  .btn-gold {
+    @apply bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400
+           text-gray-900 font-semibold px-6 py-2.5 rounded-xl transition-all duration-200
+           shadow-lg active:scale-95 cursor-pointer;
+  }
+
+  .btn-danger {
+    @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600
+           text-white font-semibold px-6 py-2.5 rounded-xl transition-all duration-200 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent border border-blue-800/50 hover:bg-blue-900/50
+           text-gray-300 hover:text-white font-medium px-6 py-2.5 rounded-xl transition-all duration-200;
+  }
+}
