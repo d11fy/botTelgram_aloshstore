@@ -4,10 +4,10 @@ import { handleUpdate } from '@/lib/bot/handler';
 export async function POST(req: NextRequest) {
   try {
     const update = await req.json();
-    // Don't await — return 200 immediately, process in background
-    handleUpdate(update).catch(console.error);
+    await handleUpdate(update);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('webhook error:', err);
     return NextResponse.json({ ok: false }, { status: 200 });
   }
 }
