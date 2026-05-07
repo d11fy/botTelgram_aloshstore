@@ -175,32 +175,15 @@ async function handleMessage(update: any, user: any) {
   // Order flow
   if (session.step === 'waiting_txid') {
     if (!text || text.length < 5) return sendTelegram(chatId, '❌ أدخل TXID صحيح');
-    setSession(userId, { ...session, txid: text, step: 'waiting_name' });
-    return sendTelegram(chatId, '👤 *أدخل اسمك الكامل:*', { parse_mode: 'Markdown' });
+    await submitOrder(chatId, userId, user, { ...session, txid: text });
+    return;
   }
 
   if (session.step === 'waiting_proof') {
     if (!photo) return sendTelegram(chatId, '❌ أرسل صورة الإيصال');
     const fileId = photo[photo.length - 1].file_id;
-    setSession(userId, { ...session, proofFileId: fileId, step: 'waiting_name' });
-    return sendTelegram(chatId, '👤 *أدخل اسمك الكامل:*', { parse_mode: 'Markdown' });
-  }
-
-  if (session.step === 'waiting_name') {
-    if (!text || text.length < 2) return sendTelegram(chatId, '❌ أدخل اسمك الكامل');
-    setSession(userId, { ...session, customerName: text, step: 'waiting_phone' });
-    return sendTelegram(chatId, '📞 *أدخل رقم هاتفك:*', { parse_mode: 'Markdown' });
-  }
-
-  if (session.step === 'waiting_phone') {
-    if (!text || text.length < 7) return sendTelegram(chatId, '❌ أدخل رقم هاتف صحيح');
-    setSession(userId, { ...session, customerPhone: text, step: 'waiting_email' });
-    return sendTelegram(chatId, '📧 *أدخل إيميلك (اختياري)*\nأو أرسل /skip', { parse_mode: 'Markdown' });
-  }
-
-  if (session.step === 'waiting_email') {
-    const email = text === '/skip' ? null : text;
-    await submitOrder(chatId, userId, user, { ...session, customerEmail: email });
+    await submitOrder(chatId, userId, user, { ...session, proofFileId: fileId });
+    return;
   }
 }
 
@@ -220,9 +203,9 @@ async function submitOrder(chatId: number, userId: number, user: any, session: a
     payment_method_name: session.payment.name,
     proof_image: session.proofFileId || null,
     txid: session.txid || null,
-    customer_name: session.customerName,
-    customer_phone: session.customerPhone,
-    customer_email: session.customerEmail || null,
+    customer_name: user?.name || null,
+    customer_phone: null,
+    customer_email: null,
     status: 'pending',
   }).select().single();
 

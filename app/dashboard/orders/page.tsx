@@ -26,8 +26,26 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState(false);
-  const [subData, setSubData] = useState("");
+  const [subType, setSubType] = useState<"email_pass"|"email"|"link"|"custom">("email_pass");
+  const [subEmail, setSubEmail] = useState("");
+  const [subPassword, setSubPassword] = useState("");
+  const [subLink, setSubLink] = useState("");
+  const [subCustom, setSubCustom] = useState("");
   const [sendingSubscription, setSendingSubscription] = useState(false);
+
+  function buildSubData() {
+    if (subType === "email_pass") return `📧 الإيميل: ${subEmail}\n🔑 الباسورد: ${subPassword}`;
+    if (subType === "email") return `📧 الإيميل: ${subEmail}`;
+    if (subType === "link") return `🔗 رابط الاشتراك:\n${subLink}`;
+    return subCustom;
+  }
+
+  function isSubReady() {
+    if (subType === "email_pass") return subEmail.trim() && subPassword.trim();
+    if (subType === "email") return subEmail.trim();
+    if (subType === "link") return subLink.trim();
+    return subCustom.trim();
+  }
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -75,16 +93,16 @@ export default function OrdersPage() {
   }
 
   async function sendSubscription() {
-    if (!subData.trim() || !selectedOrder) return;
+    if (!isSubReady() || !selectedOrder) return;
     setSendingSubscription(true);
     const res = await fetch(`/api/orders/${selectedOrder.id}/send-subscription`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subscriptionData: subData }),
+      body: JSON.stringify({ subscriptionData: buildSubData() }),
     });
     if (res.ok) {
       toast.success("✅ تم إرسال بيانات الاشتراك للعميل");
-      setSubData("");
+      setSubEmail(""); setSubPassword(""); setSubLink(""); setSubCustom("");
       setSelectedOrder({ ...selectedOrder, status: "completed" });
       fetchOrders();
     } else {
@@ -178,7 +196,7 @@ export default function OrdersPage() {
                   <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(order.created_at)}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => { setSelectedOrder(order); setSubData(""); }}
+                    <button onClick={() => { setSelectedOrder(order); setSubType("email_pass"); setSubEmail(""); setSubPassword(""); setSubLink(""); setSubCustom(""); }}
                       className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 flex items-center justify-center text-blue-400 transition-all">
                       <Eye size={15} />
                     </button>
@@ -279,16 +297,50 @@ export default function OrdersPage() {
                 <Send size={16} className="text-green-400" />
                 إرسال بيانات الاشتراك للعميل
               </p>
-              <textarea
-                value={subData}
-                onChange={e => setSubData(e.target.value)}
-                className="input-dark resize-none mb-3"
-                rows={4}
-                placeholder={`مثال:\n📧 الإيميل: example@gmail.com\n🔑 الباسورد: pass123\n\nأو رابط الاشتراك...`}
-              />
+
+              {/* Type selector */}
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {([
+                  { key: "email_pass", label: "إيميل + باسورد" },
+                  { key: "email", label: "إيميل فقط" },
+                  { key: "link", label: "رابط" },
+                  { key: "custom", label: "مخصص" },
+                ] as const).map(t => (
+                  <button key={t.key} onClick={() => setSubType(t.key)}
+                    className={cn("py-2 px-2 rounded-xl text-xs font-medium transition-all text-center",
+                      subType === t.key ? "bg-blue-600 text-white" : "glass text-gray-400 hover:text-white"
+                    )}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fields */}
+              {subType === "email_pass" && (
+                <div className="space-y-2 mb-3">
+                  <input value={subEmail} onChange={e => setSubEmail(e.target.value)}
+                    className="input-dark" placeholder="📧 الإيميل" />
+                  <input value={subPassword} onChange={e => setSubPassword(e.target.value)}
+                    className="input-dark" placeholder="🔑 الباسورد" />
+                </div>
+              )}
+              {subType === "email" && (
+                <input value={subEmail} onChange={e => setSubEmail(e.target.value)}
+                  className="input-dark mb-3" placeholder="📧 الإيميل" />
+              )}
+              {subType === "link" && (
+                <input value={subLink} onChange={e => setSubLink(e.target.value)}
+                  className="input-dark mb-3" placeholder="🔗 رابط الاشتراك" dir="ltr" />
+              )}
+              {subType === "custom" && (
+                <textarea value={subCustom} onChange={e => setSubCustom(e.target.value)}
+                  className="input-dark resize-none mb-3" rows={4}
+                  placeholder="أكتب أي بيانات تريد إرسالها..." />
+              )}
+
               <button
                 onClick={sendSubscription}
-                disabled={sendingSubscription || !subData.trim()}
+                disabled={sendingSubscription || !isSubReady()}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {sendingSubscription ? (
