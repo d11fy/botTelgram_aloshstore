@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPrice(price: number): string {
-  return `$${parseFloat(String(price)).toFixed(2)}`;
+  return `${parseFloat(String(price)).toFixed(2)} ₪`;
 }
 
 export function formatDate(dateStr: string): string {

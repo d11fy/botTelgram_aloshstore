@@ -6,18 +6,17 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import Modal from "@/components/ui/Modal";
 import { formatPrice, formatDate, STATUS_MAP } from "@/lib/utils";
 import { Order, OrderStatus } from "@/lib/types";
-import { Eye, Search, Filter, RefreshCw, Image } from "lucide-react";
+import { Eye, Search, RefreshCw, Send, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
-const STATUSES: { value: string; label: string }[] = [
+const STATUSES = [
   { value: "all", label: "الكل" },
-  { value: "pending", label: "منتظر" },
-  { value: "paid", label: "مدفوع" },
-  { value: "processing", label: "قيد التنفيذ" },
-  { value: "completed", label: "مكتمل" },
-  { value: "rejected", label: "مرفوض" },
-  { value: "cancelled", label: "ملغي" },
+  { value: "pending", label: "⏳ منتظر" },
+  { value: "paid", label: "💰 مدفوع" },
+  { value: "processing", label: "⚙️ تنفيذ" },
+  { value: "completed", label: "✅ مكتمل" },
+  { value: "rejected", label: "❌ مرفوض" },
 ];
 
 export default function OrdersPage() {
@@ -27,6 +26,8 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [subData, setSubData] = useState("");
+  const [sendingSubscription, setSendingSubscription] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -34,9 +35,7 @@ export default function OrdersPage() {
       .from("orders")
       .select("*, users(name, username, telegram_id)")
       .order("created_at", { ascending: false });
-
     if (statusFilter !== "all") query = query.eq("status", statusFilter);
-
     const { data } = await query;
     setOrders((data || []) as Order[]);
     setLoading(false);
@@ -44,15 +43,20 @@ export default function OrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
   const filtered = orders.filter(o => {
     if (!search) return true;
     const s = search.toLowerCase();
-    return (
-      o.order_number.toLowerCase().includes(s) ||
+    return o.order_number.toLowerCase().includes(s) ||
       o.product_name.toLowerCase().includes(s) ||
       (o.customer_name || "").toLowerCase().includes(s) ||
-      (o.customer_phone || "").includes(s)
-    );
+      (o.customer_phone || "").includes(s) ||
+      ((o as any).users?.username || "").toLowerCase().includes(s);
   });
 
   async function updateStatus(orderId: string, status: OrderStatus) {
@@ -64,50 +68,66 @@ export default function OrdersPage() {
     });
     if (res.ok) {
       toast.success("تم تحديث الحالة");
-      setSelectedOrder(null);
+      if (selectedOrder) setSelectedOrder({ ...selectedOrder, status });
       fetchOrders();
-    } else {
-      toast.error("حدث خطأ");
-    }
+    } else toast.error("حدث خطأ");
     setUpdating(false);
   }
 
+  async function sendSubscription() {
+    if (!subData.trim() || !selectedOrder) return;
+    setSendingSubscription(true);
+    const res = await fetch(`/api/orders/${selectedOrder.id}/send-subscription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionData: subData }),
+    });
+    if (res.ok) {
+      toast.success("✅ تم إرسال بيانات الاشتراك للعميل");
+      setSubData("");
+      setSelectedOrder({ ...selectedOrder, status: "completed" });
+      fetchOrders();
+    } else {
+      const err = await res.json();
+      toast.error(err.error || "خطأ في الإرسال");
+    }
+    setSendingSubscription(false);
+  }
+
+  const pendingCount = orders.filter(o => o.status === "pending").length;
+
   return (
     <>
-      <Header title="الطلبات" subtitle="إدارة جميع طلبات المتجر" />
+      <Header
+        title="الطلبات"
+        subtitle={pendingCount > 0 ? `⚠️ ${pendingCount} طلب بانتظار المراجعة` : "جميع الطلبات"}
+      />
 
       {/* Filters */}
-      <div className="glass rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4">
+      <div className="glass rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="بحث برقم الطلب أو العميل أو الخدمة..."
-            className="input-dark pr-10"
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="بحث..." className="input-dark pr-10"
           />
         </div>
-        <button onClick={fetchOrders} className="btn-ghost flex items-center gap-2 whitespace-nowrap">
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          تحديث
+        <button onClick={fetchOrders} className="btn-ghost flex items-center gap-2">
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> تحديث
         </button>
       </div>
 
       {/* Status tabs */}
       <div className="flex gap-2 flex-wrap mb-6">
         {STATUSES.map(s => (
-          <button
-            key={s.value}
-            onClick={() => setStatusFilter(s.value)}
-            className={cn(
-              "px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
-              statusFilter === s.value
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30"
-                : "glass text-gray-400 hover:text-white"
-            )}
-          >
+          <button key={s.value} onClick={() => setStatusFilter(s.value)}
+            className={cn("px-4 py-2 rounded-xl text-sm font-medium transition-all",
+              statusFilter === s.value ? "bg-blue-600 text-white shadow-lg" : "glass text-gray-400 hover:text-white"
+            )}>
             {s.label}
+            {s.value === "pending" && pendingCount > 0 && (
+              <span className="mr-1 bg-red-500 text-white text-xs rounded-full px-1.5">{pendingCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -118,7 +138,7 @@ export default function OrdersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-primary-800/30">
-                {["رقم الطلب", "العميل", "الخدمة", "الدفع", "المبلغ", "الحالة", "التاريخ", ""].map(h => (
+                {["رقم الطلب", "العميل", "تلجرام", "الخدمة", "المبلغ", "الحالة", "التاريخ", ""].map(h => (
                   <th key={h} className="text-right text-gray-400 text-xs font-medium px-4 py-3 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -127,34 +147,39 @@ export default function OrdersPage() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b border-primary-900/30">
-                    {[...Array(8)].map((_, j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="h-4 bg-primary-800/50 rounded animate-pulse" />
-                      </td>
-                    ))}
+                    {[...Array(8)].map((_, j) => <td key={j} className="px-4 py-4"><div className="h-4 bg-primary-800/50 rounded animate-pulse" /></td>)}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-6 py-16 text-center text-gray-500">لا توجد طلبات</td></tr>
               ) : filtered.map(order => (
-                <tr key={order.id} className="border-b border-primary-900/30 hover:bg-primary-800/20 transition-colors">
-                  <td className="px-4 py-3 text-blue-400 font-mono text-sm whitespace-nowrap">#{order.order_number}</td>
+                <tr key={order.id}
+                  className={cn("border-b border-primary-900/30 hover:bg-primary-800/20 transition-colors",
+                    order.status === "pending" && "bg-yellow-500/5"
+                  )}>
+                  <td className="px-4 py-3 text-blue-400 font-mono text-sm">#{order.order_number}</td>
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="text-white text-sm">{order.customer_name || "—"}</p>
-                      <p className="text-gray-500 text-xs">{order.customer_phone || ""}</p>
-                    </div>
+                    <p className="text-white text-sm">{order.customer_name || "—"}</p>
+                    <p className="text-gray-500 text-xs">{order.customer_phone || ""}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    {(order as any).users?.username ? (
+                      <a href={`https://t.me/${(order as any).users.username}`} target="_blank"
+                        className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1">
+                        @{(order as any).users.username}
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span className="text-gray-500 text-xs">ID: {(order as any).users?.telegram_id || "—"}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-300 text-sm">{order.product_name}</td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{order.payment_method_name}</td>
-                  <td className="px-4 py-3 text-yellow-400 text-sm font-medium whitespace-nowrap">{formatPrice(order.price)}</td>
+                  <td className="px-4 py-3 text-yellow-400 font-medium text-sm">{formatPrice(order.price)}</td>
                   <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
-                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{formatDate(order.created_at)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(order.created_at)}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => setSelectedOrder(order)}
-                      className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 flex items-center justify-center text-blue-400 transition-all"
-                    >
+                    <button onClick={() => { setSelectedOrder(order); setSubData(""); }}
+                      className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 flex items-center justify-center text-blue-400 transition-all">
                       <Eye size={15} />
                     </button>
                   </td>
@@ -165,42 +190,52 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* Order detail modal */}
-      <Modal open={!!selectedOrder} onClose={() => setSelectedOrder(null)} title={`طلب #${selectedOrder?.order_number}`} size="lg">
+      {/* Order Detail Modal */}
+      <Modal open={!!selectedOrder} onClose={() => setSelectedOrder(null)} title={`طلب #${selectedOrder?.order_number}`} size="xl">
         {selectedOrder && (
-          <div className="space-y-6">
-            {/* Info grid */}
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-5">
+            {/* Customer & Telegram info */}
+            <div className="glass rounded-xl p-4 border border-blue-500/20">
+              <p className="text-blue-400 text-xs font-medium mb-3">معلومات العميل</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><p className="text-gray-400 text-xs">الاسم</p><p className="text-white">{selectedOrder.customer_name || "—"}</p></div>
+                <div><p className="text-gray-400 text-xs">الهاتف</p><p className="text-white">{selectedOrder.customer_phone || "—"}</p></div>
+                <div><p className="text-gray-400 text-xs">الإيميل</p><p className="text-white">{selectedOrder.customer_email || "—"}</p></div>
+                <div>
+                  <p className="text-gray-400 text-xs">تلجرام</p>
+                  {(selectedOrder as any).users?.username ? (
+                    <a href={`https://t.me/${(selectedOrder as any).users.username}`} target="_blank"
+                      className="text-blue-400 hover:underline flex items-center gap-1">
+                      @{(selectedOrder as any).users.username} <ExternalLink size={11} />
+                    </a>
+                  ) : (
+                    <p className="text-white">ID: {(selectedOrder as any).users?.telegram_id || "—"}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Order info */}
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "العميل", value: selectedOrder.customer_name },
-                { label: "الهاتف", value: selectedOrder.customer_phone },
-                { label: "الإيميل", value: selectedOrder.customer_email },
                 { label: "الخدمة", value: selectedOrder.product_name },
                 { label: "المدة", value: selectedOrder.product_duration },
-                { label: "السعر", value: formatPrice(selectedOrder.price) },
+                { label: "المبلغ", value: formatPrice(selectedOrder.price) },
                 { label: "طريقة الدفع", value: selectedOrder.payment_method_name },
                 { label: "TXID", value: selectedOrder.txid },
-              ].filter(f => f.value).map(field => (
-                <div key={field.label} className="glass rounded-xl p-3">
-                  <p className="text-gray-400 text-xs mb-1">{field.label}</p>
-                  <p className="text-white text-sm font-medium break-all">{field.value}</p>
+              ].filter(f => f.value).map(f => (
+                <div key={f.label} className="glass rounded-xl p-3">
+                  <p className="text-gray-400 text-xs mb-1">{f.label}</p>
+                  <p className="text-white text-sm break-all">{f.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Proof image */}
+            {/* Payment proof */}
             {selectedOrder.proof_image && (
-              <div>
+              <div className="glass rounded-xl p-3">
                 <p className="text-gray-400 text-xs mb-2">إثبات الدفع</p>
-                <a
-                  href={`https://api.telegram.org/file/bot${process.env.NEXT_PUBLIC_BOT_FILE_TOKEN}/${selectedOrder.proof_image}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  <Image size={16} />
-                  عرض صورة الإثبات
-                </a>
+                <p className="text-yellow-400 text-xs">📎 صورة مرفقة من تلجرام (File ID: {selectedOrder.proof_image.slice(0, 20)}...)</p>
               </div>
             )}
 
@@ -212,24 +247,45 @@ export default function OrdersPage() {
 
             {/* Change status */}
             <div>
-              <p className="text-gray-400 text-sm font-medium mb-3">تغيير الحالة:</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <p className="text-sm text-gray-300 font-medium mb-2">تغيير الحالة:</p>
+              <div className="grid grid-cols-3 gap-2">
                 {(["paid", "processing", "completed", "rejected", "cancelled"] as OrderStatus[]).map(s => (
-                  <button
-                    key={s}
-                    disabled={updating || selectedOrder.status === s}
+                  <button key={s} disabled={updating || selectedOrder.status === s}
                     onClick={() => updateStatus(selectedOrder.id, s)}
-                    className={cn(
-                      "py-2 px-3 rounded-xl text-xs font-medium transition-all",
-                      selectedOrder.status === s
-                        ? "opacity-40 cursor-not-allowed bg-primary-800/50 text-gray-400"
+                    className={cn("py-2 px-3 rounded-xl text-xs font-medium transition-all",
+                      selectedOrder.status === s ? "opacity-40 cursor-not-allowed bg-primary-800/50 text-gray-400"
                         : `${STATUS_MAP[s].bg} ${STATUS_MAP[s].color} hover:opacity-80`
-                    )}
-                  >
-                    {updating ? "..." : STATUS_MAP[s].label}
+                    )}>
+                    {STATUS_MAP[s].label}
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Send subscription data */}
+            <div className="border-t border-primary-800/50 pt-4">
+              <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Send size={16} className="text-green-400" />
+                إرسال بيانات الاشتراك للعميل
+              </p>
+              <textarea
+                value={subData}
+                onChange={e => setSubData(e.target.value)}
+                className="input-dark resize-none mb-3"
+                rows={4}
+                placeholder={`مثال:\n📧 الإيميل: example@gmail.com\n🔑 الباسورد: pass123\n\nأو رابط الاشتراك...`}
+              />
+              <button
+                onClick={sendSubscription}
+                disabled={sendingSubscription || !subData.trim()}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                {sendingSubscription ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : <Send size={16} />}
+                {sendingSubscription ? "جاري الإرسال..." : "إرسال للعميل عبر تلجرام ✈️"}
+              </button>
+              <p className="text-gray-500 text-xs mt-2 text-center">سيتم إرسال البيانات مباشرة لتلجرام العميل وتحديث الطلب إلى مكتمل</p>
             </div>
           </div>
         )}
