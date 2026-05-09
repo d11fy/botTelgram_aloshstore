@@ -18,8 +18,8 @@ async function tg(method: string, body: any) {
 
 const REPLY_KEYBOARD = {
   keyboard: [
-    [{ text: '🛒 المنتجات' }, { text: '🔥 العروض' }],
-    [{ text: '📦 طلباتي' }],
+    [{ text: '🛍 المنتجات' }, { text: '📦 طلباتي' }],
+    [{ text: '❓ الأسئلة الشائعة' }],
     [{ text: '💬 الدعم الفني' }, { text: '💳 طرق الدفع' }],
   ],
   resize_keyboard: true,
@@ -29,10 +29,15 @@ const REPLY_KEYBOARD = {
 // ─── Main Menu ───────────────────────────────────────────────────────────────
 async function showMainMenu(chatId: number, name: string, messageId?: number) {
   const supabase = getSupabase();
-  const { data: settings } = await supabase.from('settings').select('key,value').in('key', ['welcome_message']);
-  const welcome = settings?.find(s => s.key === 'welcome_message')?.value || 'مرحباً بك في علوش ستور 🌟';
+  const { data: settings } = await supabase.from('settings').select('key,value').in('key', ['welcome_message', 'store_name']);
+  const storeName = settings?.find(s => s.key === 'store_name')?.value || 'علوش ستور';
+  const welcome = settings?.find(s => s.key === 'welcome_message')?.value;
 
-  const text = `${welcome}\n\nأهلاً *${name}* 👋\n\nاختر من القائمة:`;
+  const text = welcome ||
+    `👋 أهلاً *${name}* في *${storeName}*!\n\n` +
+    `🛍 متجر الخدمات الرقمية\n` +
+    `⚡ سرعة – أمان – احتراف\n\n` +
+    `👇 اختر من القائمة بالأسفل`;
 
   if (messageId) {
     await tg('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' });
@@ -54,6 +59,42 @@ async function showCategoriesAsMessage(chatId: number) {
       ],
     },
   });
+}
+
+async function showMyOrders(chatId: number, userId: number) {
+  const { data: dbUser } = await getSupabase().from('users').select('id').eq('telegram_id', userId).single();
+  if (!dbUser) return sendTelegram(chatId, '📦 لا توجد طلبات بعد');
+  const { data: orders } = await getSupabase().from('orders').select('*').eq('user_id', dbUser.id).order('created_at', { ascending: false }).limit(5);
+  const statusEmoji: any = { pending: '⏳', paid: '💰', processing: '⚙️', completed: '✅', rejected: '❌', cancelled: '🚫' };
+  let txt = `📦 *طلباتك الأخيرة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
+  if (!orders?.length) txt += 'لا توجد طلبات بعد';
+  else orders.forEach((o, i) => { txt += `${i + 1}. ${statusEmoji[o.status] || '❓'} *${o.product_name}*\n   #${o.order_number} | ${formatPrice(o.price)}\n\n`; });
+  return sendTelegram(chatId, txt);
+}
+
+async function showFaq(chatId: number) {
+  return sendTelegram(chatId,
+    `❓ *الأسئلة الشائعة*\n━━━━━━━━━━━━━━━━━━\n\n` +
+    `*كيف أطلب؟*\n اضغط المنتجات، اختر الخدمة، ادفع وأرسل الإيصال\n\n` +
+    `*متى يصل الاشتراك؟*\n خلال دقائق بعد تأكيد الدفع\n\n` +
+    `*هل الدفع آمن؟*\n نعم، نراجع كل طلب يدوياً قبل التسليم\n\n` +
+    `*كيف أتواصل معكم؟*\n اضغط على زر الدعم الفني في الأسفل`
+  );
+}
+
+async function showSupport(chatId: number) {
+  return sendTelegram(chatId,
+    `💬 *الدعم الفني*\n━━━━━━━━━━━━━━━━━━\n\n` +
+    `للتواصل المباشر: @AloshSupport\n⏰ متاحون 24/7\n\n` +
+    `أو أرسل لنا رسالتك وسنرد عليك فوراً`
+  );
+}
+
+async function showPaymentMethods(chatId: number) {
+  const { data: pms } = await getSupabase().from('payment_methods').select('*').eq('status', true);
+  let txt = `💳 *طرق الدفع المتاحة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
+  pms?.forEach(pm => { txt += `${pm.icon} *${pm.name}*\n📋 \`${pm.value}\`\n` + (pm.instructions ? `📌 ${pm.instructions}\n` : '') + '\n'; });
+  return sendTelegram(chatId, txt);
 }
 
 // ─── Categories ──────────────────────────────────────────────────────────────
@@ -188,26 +229,13 @@ async function handleMessage(update: any, user: any) {
     return sendTelegram(chatId, '✅ تم إرسال الرسالة للعميل');
   }
 
-  // Reply keyboard buttons
+  // Reply keyboard buttons + commands
   if (!session.step) {
-    if (text === '🛒 المنتجات' || text === '🔥 العروض') return showCategoriesAsMessage(chatId);
-    if (text === '📦 طلباتي') {
-      const { data: dbUser } = await getSupabase().from('users').select('id').eq('telegram_id', userId).single();
-      const statusEmoji: any = { pending: '⏳', paid: '💰', processing: '⚙️', completed: '✅', rejected: '❌', cancelled: '🚫' };
-      if (!dbUser) return sendTelegram(chatId, 'لا توجد طلبات بعد');
-      const { data: orders } = await getSupabase().from('orders').select('*').eq('user_id', dbUser.id).order('created_at', { ascending: false }).limit(5);
-      let txt = `📦 *طلباتك الأخيرة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
-      if (!orders?.length) txt += 'لا توجد طلبات بعد';
-      else orders.forEach((o, i) => { txt += `${i + 1}. ${statusEmoji[o.status] || '❓'} *${o.product_name}*\n   #${o.order_number} | ${formatPrice(o.price)}\n\n`; });
-      return sendTelegram(chatId, txt);
-    }
-    if (text === '💬 الدعم الفني') return sendTelegram(chatId, `🛠 *الدعم الفني*\n━━━━━━━━━━━━━━━━━━\nللتواصل: @AloshSupport\n⏰ متاحون 24/7`);
-    if (text === '💳 طرق الدفع') {
-      const { data: pms } = await getSupabase().from('payment_methods').select('*').eq('status', true);
-      let txt = `💳 *طرق الدفع المتاحة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
-      pms?.forEach(pm => { txt += `${pm.icon} *${pm.name}*\n📋 \`${pm.value}\`\n` + (pm.instructions ? `📌 ${pm.instructions}\n` : '') + '\n'; });
-      return sendTelegram(chatId, txt);
-    }
+    if (text === '🛍 المنتجات' || text === '/products') return showCategoriesAsMessage(chatId);
+    if (text === '📦 طلباتي' || text === '/orders') return showMyOrders(chatId, userId);
+    if (text === '❓ الأسئلة الشائعة' || text === '/faq') return showFaq(chatId);
+    if (text === '💬 الدعم الفني' || text === '/support') return showSupport(chatId);
+    if (text === '💳 طرق الدفع') return showPaymentMethods(chatId);
     return;
   }
 
@@ -283,10 +311,7 @@ async function handleCallback(update: any, user: any) {
     return answerCallback(cbId);
   }
   if (data === 'support' || data === 'contact_admin') {
-    await editTelegram(chatId, messageId,
-      `🛠 *الدعم الفني*\n━━━━━━━━━━━━━━━━━━\nللتواصل: @AloshSupport\n⏰ متاحون 24/7`,
-      { reply_markup: { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'main_menu' }]] } }
-    );
+    await showSupport(chatId);
     return answerCallback(cbId);
   }
   if (data === 'my_orders') {
@@ -346,9 +371,11 @@ export async function handleUpdate(update: any) {
 
     if (update.message) {
       const text = update.message.text || '';
-      if (text === '/start' || text === '/menu') {
-        return showMainMenu(chatId, name);
-      }
+      if (text === '/start' || text === '/menu') return showMainMenu(chatId, name);
+      if (text === '/products') return showCategoriesAsMessage(chatId);
+      if (text === '/orders') return showMyOrders(chatId, telegramUser.id);
+      if (text === '/faq') return showFaq(chatId);
+      if (text === '/support') return showSupport(chatId);
       return handleMessage(update, user);
     }
 
