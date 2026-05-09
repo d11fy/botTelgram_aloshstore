@@ -20,6 +20,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
   }
 
+  const { data: settingsRows } = await supabaseAdmin.from('settings').select('key,value');
+  const settings: Record<string, string> = {};
+  settingsRows?.forEach(s => { settings[s.key] = s.value || ''; });
+  const footer = settings.subscription_footer || `شكراً لثقتك بـ ${settings.store_name || 'علوش ستور'} ❤️`;
+
   const message =
     `🎉 *بيانات اشتراكك جاهزة!*\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
@@ -28,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `━━━━━━━━━━━━━━━━━━\n` +
     `${subscriptionData}\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
-    `شكراً لثقتك بعلوش ستور ❤️`;
+    footer;
 
   const res = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
     method: 'POST',

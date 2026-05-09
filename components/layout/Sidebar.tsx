@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, Package, Grid, CreditCard,
   ShoppingCart, BarChart3, LogOut,
-  Star, Menu, X, ChevronRight, Megaphone
+  Star, Menu, X, ChevronRight, Megaphone, Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ const navItems = [
   { href: "/dashboard/payments", icon: CreditCard, label: "طرق الدفع" },
   { href: "/dashboard/stats", icon: BarChart3, label: "الإحصائيات" },
   { href: "/dashboard/broadcast", icon: Megaphone, label: "رسالة جماعية" },
+  { href: "/dashboard/settings", icon: Settings, label: "إعدادات البوت" },
 ];
 
 export default function Sidebar() {
