@@ -16,6 +16,16 @@ async function tg(method: string, body: any) {
   });
 }
 
+const REPLY_KEYBOARD = {
+  keyboard: [
+    [{ text: '🛒 المنتجات' }, { text: '🔥 العروض' }],
+    [{ text: '📦 طلباتي' }],
+    [{ text: '💬 الدعم الفني' }, { text: '💳 طرق الدفع' }],
+  ],
+  resize_keyboard: true,
+  persistent: true,
+};
+
 // ─── Main Menu ───────────────────────────────────────────────────────────────
 async function showMainMenu(chatId: number, name: string, messageId?: number) {
   const supabase = getSupabase();
@@ -23,19 +33,27 @@ async function showMainMenu(chatId: number, name: string, messageId?: number) {
   const welcome = settings?.find(s => s.key === 'welcome_message')?.value || 'مرحباً بك في علوش ستور 🌟';
 
   const text = `${welcome}\n\nأهلاً *${name}* 👋\n\nاختر من القائمة:`;
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: '🛒 تصفح الاشتراكات', callback_data: 'browse_products' }, { text: '🔥 العروض', callback_data: 'current_offers' }],
-      [{ text: '📦 طلباتي', callback_data: 'my_orders' }, { text: '💳 طرق الدفع', callback_data: 'payment_methods' }],
-      [{ text: '🛠 الدعم الفني', callback_data: 'support' }, { text: '📞 تواصل معنا', callback_data: 'contact_admin' }],
-    ],
-  };
 
   if (messageId) {
-    await tg('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown', reply_markup: keyboard });
+    await tg('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' });
   } else {
-    await tg('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown', reply_markup: keyboard });
+    await tg('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown', reply_markup: REPLY_KEYBOARD });
   }
+}
+
+async function showCategoriesAsMessage(chatId: number) {
+  const { data: cats } = await getSupabase().from('categories').select('*').eq('status', true).order('sort_order');
+  if (!cats?.length) return sendTelegram(chatId, '❌ لا توجد تصنيفات');
+  await tg('sendMessage', {
+    chat_id: chatId,
+    text: '📂 *اختر التصنيف:*',
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        ...cats.map(c => [{ text: `${c.icon} ${c.name}`, callback_data: `cat_${c.id}` }]),
+      ],
+    },
+  });
 }
 
 // ─── Categories ──────────────────────────────────────────────────────────────
@@ -170,7 +188,28 @@ async function handleMessage(update: any, user: any) {
     return sendTelegram(chatId, '✅ تم إرسال الرسالة للعميل');
   }
 
-  if (!session.step) return;
+  // Reply keyboard buttons
+  if (!session.step) {
+    if (text === '🛒 المنتجات' || text === '🔥 العروض') return showCategoriesAsMessage(chatId);
+    if (text === '📦 طلباتي') {
+      const { data: dbUser } = await getSupabase().from('users').select('id').eq('telegram_id', userId).single();
+      const statusEmoji: any = { pending: '⏳', paid: '💰', processing: '⚙️', completed: '✅', rejected: '❌', cancelled: '🚫' };
+      if (!dbUser) return sendTelegram(chatId, 'لا توجد طلبات بعد');
+      const { data: orders } = await getSupabase().from('orders').select('*').eq('user_id', dbUser.id).order('created_at', { ascending: false }).limit(5);
+      let txt = `📦 *طلباتك الأخيرة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
+      if (!orders?.length) txt += 'لا توجد طلبات بعد';
+      else orders.forEach((o, i) => { txt += `${i + 1}. ${statusEmoji[o.status] || '❓'} *${o.product_name}*\n   #${o.order_number} | ${formatPrice(o.price)}\n\n`; });
+      return sendTelegram(chatId, txt);
+    }
+    if (text === '💬 الدعم الفني') return sendTelegram(chatId, `🛠 *الدعم الفني*\n━━━━━━━━━━━━━━━━━━\nللتواصل: @AloshSupport\n⏰ متاحون 24/7`);
+    if (text === '💳 طرق الدفع') {
+      const { data: pms } = await getSupabase().from('payment_methods').select('*').eq('status', true);
+      let txt = `💳 *طرق الدفع المتاحة:*\n━━━━━━━━━━━━━━━━━━\n\n`;
+      pms?.forEach(pm => { txt += `${pm.icon} *${pm.name}*\n📋 \`${pm.value}\`\n` + (pm.instructions ? `📌 ${pm.instructions}\n` : '') + '\n'; });
+      return sendTelegram(chatId, txt);
+    }
+    return;
+  }
 
   // Order flow
   if (session.step === 'waiting_txid') {

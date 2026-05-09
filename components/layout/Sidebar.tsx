@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, Package, Grid, CreditCard,
-  ShoppingCart, BarChart3, Settings, LogOut,
-  Star, Menu, X, ChevronRight
+  ShoppingCart, BarChart3, LogOut,
+  Star, Menu, X, ChevronRight, Megaphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ const navItems = [
   { href: "/dashboard/categories", icon: Grid, label: "التصنيفات" },
   { href: "/dashboard/payments", icon: CreditCard, label: "طرق الدفع" },
   { href: "/dashboard/stats", icon: BarChart3, label: "الإحصائيات" },
+  { href: "/dashboard/broadcast", icon: Megaphone, label: "رسالة جماعية" },
 ];
 
 export default function Sidebar() {
