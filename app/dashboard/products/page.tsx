@@ -12,7 +12,16 @@ import { cn } from "@/lib/utils";
 const emptyProduct: Partial<Product> = {
   name: "", description: "", category_id: "", price: 0, cost: 0,
   duration: "", activation_method: "", warranty: "", notes: "", status: true, sort_order: 0,
+  required_info_type: "none", required_info_prompt: "" as string | undefined,
 };
+
+const INFO_TYPES = [
+  { value: "none", label: "لا يحتاج معلومات" },
+  { value: "email", label: "📧 إيميل" },
+  { value: "email_password", label: "📧 إيميل + باسورد" },
+  { value: "link", label: "🔗 رابط" },
+  { value: "custom", label: "✏️ سؤال مخصص" },
+];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -50,6 +59,8 @@ export default function ProductsPage() {
       duration: editing.duration, activation_method: editing.activation_method || null,
       warranty: editing.warranty || null, notes: editing.notes || null,
       status: editing.status ?? true, sort_order: Number(editing.sort_order || 0),
+      required_info_type: editing.required_info_type || "none",
+      required_info_prompt: editing.required_info_prompt || null,
     };
 
     if (editing.id) {
@@ -196,6 +207,36 @@ export default function ProductsPage() {
             <div className="sm:col-span-2">
               <label className="block text-sm text-gray-400 mb-1">ملاحظات</label>
               <textarea value={editing.notes || ""} onChange={e => setEditing(p => ({ ...p, notes: e.target.value }))} className="input-dark resize-none" rows={2} placeholder="أي ملاحظات إضافية..." />
+            </div>
+
+            {/* Required info from customer */}
+            <div className="sm:col-span-2 border-t border-primary-800/40 pt-4">
+              <label className="block text-sm text-white font-medium mb-2">📋 معلومات مطلوبة من العميل عند الطلب</label>
+              <select
+                value={editing.required_info_type || "none"}
+                onChange={e => setEditing(p => ({ ...p, required_info_type: e.target.value }))}
+                className="input-dark mb-3"
+              >
+                {INFO_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+
+              {editing.required_info_type && editing.required_info_type !== "none" && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">رسالة للعميل (اختياري)</label>
+                  <input
+                    value={editing.required_info_prompt || ""}
+                    onChange={e => setEditing(p => ({ ...p, required_info_prompt: e.target.value }))}
+                    className="input-dark"
+                    placeholder={
+                      editing.required_info_type === "email" ? "أرسل الإيميل الذي تريد التفعيل عليه" :
+                      editing.required_info_type === "email_password" ? "أرسل الإيميل وكلمة السر" :
+                      editing.required_info_type === "link" ? "أرسل الرابط المطلوب" :
+                      "اكتب سؤالك للعميل..."
+                    }
+                  />
+                  <p className="text-gray-600 text-xs mt-1">اتركه فارغاً لاستخدام الرسالة الافتراضية</p>
+                </div>
+              )}
             </div>
           </div>
 

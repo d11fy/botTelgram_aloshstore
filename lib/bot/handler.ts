@@ -166,7 +166,9 @@ async function startOrder(chatId: number, messageId: number, productId: string, 
   const { data: payments } = await getSupabase().from('payment_methods').select('*').eq('status', true).order('sort_order');
   if (!payments?.length) return answerCallback(cbId, 'لا توجد طرق دفع متاحة', true);
 
-  setSession(userId, { productId, product: p, step: 'payment_method' });
+  // fetch full product including required_info fields
+  const { data: fullProduct } = await getSupabase().from('products').select('*').eq('id', productId).single();
+  setSession(userId, { productId, product: fullProduct || p, step: 'payment_method' });
 
   await editTelegram(chatId, messageId,
     `🛒 *طلب جديد*\n━━━━━━━━━━━━━━━━━━\n📦 ${p.name}\n💵 ${formatPrice(p.price)}\n⏱ ${p.duration}\n━━━━━━━━━━━━━━━━━━\n\n💳 *اختر طريقة الدفع:*`,
@@ -180,6 +182,21 @@ async function startOrder(chatId: number, messageId: number, productId: string, 
     }
   );
   await answerCallback(cbId);
+}
+
+async function askRequiredInfo(chatId: number, userId: number, session: any) {
+  const type = session.product.required_info_type || 'none';
+  const customPrompt = session.product.required_info_prompt;
+
+  const prompts: Record<string, string> = {
+    email: customPrompt || '📧 أرسل الإيميل الذي تريد التفعيل عليه:',
+    email_password: customPrompt || '📧 أرسل الإيميل وكلمة السر مفصولين بمسافة أو سطر جديد:',
+    link: customPrompt || '🔗 أرسل الرابط المطلوب:',
+    custom: customPrompt || 'أرسل المعلومات المطلوبة:',
+  };
+
+  setSession(userId, { ...session, step: `waiting_info_${type}` });
+  return sendTelegram(chatId, prompts[type] || 'أرسل المعلومات المطلوبة:', { parse_mode: 'Markdown' });
 }
 
 async function selectPayment(chatId: number, messageId: number, paymentId: string, userId: number, cbId: string) {
@@ -244,14 +261,28 @@ async function handleMessage(update: any, user: any) {
   // Order flow
   if (session.step === 'waiting_txid') {
     if (!text || text.length < 5) return sendTelegram(chatId, '❌ أدخل TXID صحيح');
-    await submitOrder(chatId, userId, user, { ...session, txid: text });
+    const next = { ...session, txid: text };
+    if (session.product?.required_info_type && session.product.required_info_type !== 'none') {
+      return askRequiredInfo(chatId, userId, next);
+    }
+    await submitOrder(chatId, userId, user, next);
     return;
   }
 
   if (session.step === 'waiting_proof') {
     if (!photo) return sendTelegram(chatId, '❌ أرسل صورة الإيصال');
     const fileId = photo[photo.length - 1].file_id;
-    await submitOrder(chatId, userId, user, { ...session, proofFileId: fileId });
+    const next = { ...session, proofFileId: fileId };
+    if (session.product?.required_info_type && session.product.required_info_type !== 'none') {
+      return askRequiredInfo(chatId, userId, next);
+    }
+    await submitOrder(chatId, userId, user, next);
+    return;
+  }
+
+  if (session.step?.startsWith('waiting_info_')) {
+    if (!text || text.length < 1) return sendTelegram(chatId, '❌ يرجى إرسال المعلومات المطلوبة');
+    await submitOrder(chatId, userId, user, { ...session, customerNotes: text });
     return;
   }
 }
@@ -275,6 +306,7 @@ async function submitOrder(chatId: number, userId: number, user: any, session: a
     customer_name: user?.name || null,
     customer_phone: null,
     customer_email: null,
+    customer_notes: session.customerNotes || null,
     status: 'pending',
   }).select().single();
 

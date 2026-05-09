@@ -21,6 +21,8 @@ export interface Product {
   warranty?: string;
   notes?: string;
   image_url?: string;
+  required_info_type?: string;
+  required_info_prompt?: string;
   status: boolean;
   sort_order: number;
   created_at: string;
@@ -77,6 +79,7 @@ export interface Order {
   customer_name?: string;
   customer_phone?: string;
   customer_email?: string;
+  customer_notes?: string;
   notes?: string;
   status: OrderStatus;
   admin_notes?: string;

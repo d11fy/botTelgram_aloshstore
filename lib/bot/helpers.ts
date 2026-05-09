@@ -84,6 +84,7 @@ export async function notifyAdmins(order: any, user: any, proofFileId?: string) 
     `💵 ${formatPrice(order.price)}\n` +
     `💳 ${order.payment_method_name}\n` +
     (order.txid ? `🔗 TXID: \`${order.txid}\`\n` : '') +
+    (order.customer_notes ? `📋 *معلومات العميل:*\n${order.customer_notes}\n` : '') +
     `━━━━━━━━━━━━━━━━━━`;
 
   const keyboard = {

@@ -241,6 +241,7 @@ export default function OrdersPage() {
                 { label: "المبلغ", value: formatPrice(selectedOrder.price) },
                 { label: "طريقة الدفع", value: selectedOrder.payment_method_name },
                 { label: "TXID", value: selectedOrder.txid },
+                { label: "📋 معلومات العميل", value: (selectedOrder as any).customer_notes },
               ].filter(f => f.value).map(f => (
                 <div key={f.label} className="glass rounded-xl p-3">
                   <p className="text-gray-400 text-xs mb-1">{f.label}</p>
