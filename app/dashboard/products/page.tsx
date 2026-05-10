@@ -52,16 +52,18 @@ export default function ProductsPage() {
       return toast.error("يرجى ملء الحقول المطلوبة");
     }
     setSaving(true);
-    const data = {
+    const data: any = {
       name: editing.name, description: editing.description || null,
       category_id: editing.category_id || null,
       price: Number(editing.price), cost: Number(editing.cost || 0),
       duration: editing.duration, activation_method: editing.activation_method || null,
       warranty: editing.warranty || null, notes: editing.notes || null,
       status: editing.status ?? true, sort_order: Number(editing.sort_order || 0),
-      required_info_type: editing.required_info_type || "none",
-      required_info_prompt: editing.required_info_prompt || null,
     };
+    if (editing.required_info_type && editing.required_info_type !== "none") {
+      data.required_info_type = editing.required_info_type;
+      data.required_info_prompt = editing.required_info_prompt || null;
+    }
 
     if (editing.id) {
       const { error } = await supabase.from("products").update(data).eq("id", editing.id);
