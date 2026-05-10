@@ -292,7 +292,7 @@ async function submitOrder(chatId: number, userId: number, user: any, session: a
   clearSession(userId);
 
   const orderNumber = generateOrderNumber();
-  const { data: order, error } = await supabase.from('orders').insert({
+  const insertData: any = {
     order_number: orderNumber,
     user_id: user?.id,
     product_id: session.productId,
@@ -306,11 +306,14 @@ async function submitOrder(chatId: number, userId: number, user: any, session: a
     customer_name: user?.name || null,
     customer_phone: null,
     customer_email: null,
-    customer_notes: session.customerNotes || null,
     status: 'pending',
-  }).select().single();
+  };
+  if (session.customerNotes) insertData.customer_notes = session.customerNotes;
+
+  const { data: order, error } = await supabase.from('orders').insert(insertData).select().single();
 
   if (error || !order) {
+    console.error('submitOrder error:', JSON.stringify(error));
     return sendTelegram(chatId, '❌ حدث خطأ، يرجى المحاولة مرة أخرى');
   }
 
