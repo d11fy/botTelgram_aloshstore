@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import Modal from "@/components/ui/Modal";
 import { Product, Category } from "@/lib/types";
@@ -66,11 +66,11 @@ export default function ProductsPage() {
     }
 
     if (editing.id) {
-      const { error } = await supabase.from("products").update(data).eq("id", editing.id);
-      if (error) { toast.error("خطأ في التحديث"); } else { toast.success("تم التحديث"); }
+      const { error } = await supabaseAdmin.from("products").update(data).eq("id", editing.id);
+      if (error) { console.error(error); toast.error("خطأ في التحديث"); } else { toast.success("تم التحديث"); }
     } else {
-      const { error } = await supabase.from("products").insert(data);
-      if (error) { toast.error("خطأ في الإضافة"); } else { toast.success("تمت الإضافة"); }
+      const { error } = await supabaseAdmin.from("products").insert(data);
+      if (error) { console.error(error); toast.error("خطأ في الإضافة"); } else { toast.success("تمت الإضافة"); }
     }
 
     setSaving(false);
@@ -79,13 +79,13 @@ export default function ProductsPage() {
   }
 
   async function toggleStatus(id: string, status: boolean) {
-    await supabase.from("products").update({ status: !status }).eq("id", id);
+    await supabaseAdmin.from("products").update({ status: !status }).eq("id", id);
     fetchData();
   }
 
   async function deleteProduct(id: string, name: string) {
     if (!confirm(`هل أنت متأكد من حذف "${name}"؟`)) return;
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
     if (error) toast.error("لا يمكن حذف منتج مرتبط بطلبات");
     else { toast.success("تم الحذف"); fetchData(); }
   }

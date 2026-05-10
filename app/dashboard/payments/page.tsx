@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import Header from "@/components/layout/Header";
 import Modal from "@/components/ui/Modal";
 import { PaymentMethod } from "@/lib/types";
@@ -52,10 +52,10 @@ export default function PaymentsPage() {
     };
 
     if (editing.id) {
-      const { error } = await supabase.from("payment_methods").update(data).eq("id", editing.id);
+      const { error } = await supabaseAdmin.from("payment_methods").update(data).eq("id", editing.id);
       if (error) toast.error("خطأ"); else toast.success("تم التحديث");
     } else {
-      const { error } = await supabase.from("payment_methods").insert(data);
+      const { error } = await supabaseAdmin.from("payment_methods").insert(data);
       if (error) toast.error("خطأ"); else toast.success("تمت الإضافة");
     }
     setSaving(false);
@@ -64,13 +64,13 @@ export default function PaymentsPage() {
   }
 
   async function toggleStatus(id: string, status: boolean) {
-    await supabase.from("payment_methods").update({ status: !status }).eq("id", id);
+    await supabaseAdmin.from("payment_methods").update({ status: !status }).eq("id", id);
     fetchMethods();
   }
 
   async function deleteMethod(id: string, name: string) {
     if (!confirm(`حذف "${name}"؟`)) return;
-    const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+    const { error } = await supabaseAdmin.from("payment_methods").delete().eq("id", id);
     if (error) toast.error("خطأ في الحذف");
     else { toast.success("تم الحذف"); fetchMethods(); }
   }
