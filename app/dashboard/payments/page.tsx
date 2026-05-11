@@ -52,11 +52,11 @@ export default function PaymentsPage() {
     };
 
     if (editing.id) {
-      const { error } = await supabaseAdmin.from("payment_methods").update(data).eq("id", editing.id);
-      if (error) toast.error("خطأ"); else toast.success("تم التحديث");
+      const res = await fetch(`/api/payment-methods/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!res.ok) toast.error("خطأ في التحديث"); else toast.success("تم التحديث");
     } else {
-      const { error } = await supabaseAdmin.from("payment_methods").insert(data);
-      if (error) toast.error("خطأ"); else toast.success("تمت الإضافة");
+      const res = await fetch("/api/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!res.ok) toast.error("خطأ في الإضافة"); else toast.success("تمت الإضافة");
     }
     setSaving(false);
     setModalOpen(false);
@@ -64,14 +64,14 @@ export default function PaymentsPage() {
   }
 
   async function toggleStatus(id: string, status: boolean) {
-    await supabaseAdmin.from("payment_methods").update({ status: !status }).eq("id", id);
+    await fetch(`/api/payment-methods/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: !status }) });
     fetchMethods();
   }
 
   async function deleteMethod(id: string, name: string) {
     if (!confirm(`حذف "${name}"؟`)) return;
-    const { error } = await supabaseAdmin.from("payment_methods").delete().eq("id", id);
-    if (error) toast.error("خطأ في الحذف");
+    const res = await fetch(`/api/payment-methods/${id}`, { method: "DELETE" });
+    if (!res.ok) toast.error("خطأ في الحذف");
     else { toast.success("تم الحذف"); fetchMethods(); }
   }
 

@@ -38,11 +38,11 @@ export default function CategoriesPage() {
     const data = { name: editing.name, name_en: editing.name_en || null, icon: editing.icon || "📦", sort_order: Number(editing.sort_order || 0), status: editing.status ?? true };
 
     if (editing.id) {
-      const { error } = await supabaseAdmin.from("categories").update(data).eq("id", editing.id);
-      if (error) toast.error("خطأ"); else toast.success("تم التحديث");
+      const res = await fetch(`/api/categories/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!res.ok) toast.error("خطأ في التحديث"); else toast.success("تم التحديث");
     } else {
-      const { error } = await supabaseAdmin.from("categories").insert(data);
-      if (error) toast.error("خطأ"); else toast.success("تمت الإضافة");
+      const res = await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!res.ok) toast.error("خطأ في الإضافة"); else toast.success("تمت الإضافة");
     }
     setSaving(false);
     setModalOpen(false);
@@ -51,8 +51,8 @@ export default function CategoriesPage() {
 
   async function deleteCategory(id: string, name: string) {
     if (!confirm(`حذف "${name}"؟`)) return;
-    const { error } = await supabaseAdmin.from("categories").delete().eq("id", id);
-    if (error) toast.error("لا يمكن حذف تصنيف مرتبط بمنتجات");
+    const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+    if (!res.ok) toast.error("لا يمكن حذف تصنيف مرتبط بمنتجات");
     else { toast.success("تم الحذف"); fetchCategories(); }
   }
 

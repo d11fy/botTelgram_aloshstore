@@ -66,11 +66,17 @@ export default function ProductsPage() {
     }
 
     if (editing.id) {
-      const { error } = await supabaseAdmin.from("products").update(data).eq("id", editing.id);
-      if (error) { console.error(error); toast.error("خطأ في التحديث"); } else { toast.success("تم التحديث"); }
+      const res = await fetch(`/api/products/${editing.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      if (!res.ok) { const e = await res.json(); toast.error(e.error || "خطأ في التحديث"); }
+      else toast.success("تم التحديث");
     } else {
-      const { error } = await supabaseAdmin.from("products").insert(data);
-      if (error) { console.error(error); toast.error("خطأ في الإضافة"); } else { toast.success("تمت الإضافة"); }
+      const res = await fetch("/api/products", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      if (!res.ok) { const e = await res.json(); toast.error(e.error || "خطأ في الإضافة"); }
+      else toast.success("تمت الإضافة");
     }
 
     setSaving(false);
@@ -79,14 +85,16 @@ export default function ProductsPage() {
   }
 
   async function toggleStatus(id: string, status: boolean) {
-    await supabaseAdmin.from("products").update({ status: !status }).eq("id", id);
+    await fetch(`/api/products/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: !status }),
+    });
     fetchData();
   }
 
   async function deleteProduct(id: string, name: string) {
     if (!confirm(`هل أنت متأكد من حذف "${name}"؟`)) return;
-    const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
-    if (error) toast.error("لا يمكن حذف منتج مرتبط بطلبات");
+    const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    if (!res.ok) toast.error("لا يمكن حذف منتج مرتبط بطلبات");
     else { toast.success("تم الحذف"); fetchData(); }
   }
 
